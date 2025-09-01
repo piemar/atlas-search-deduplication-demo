@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Customer Support System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Duplicate Detection Settings</h1>
+    <p class="subtitle">Configure thresholds and limits for duplicate detection and search results.</p>
+</div>
+
+<div class="settings-container">
+    <form method="POST" class="settings-form">
+        <div class="settings-section">
+            <h2>🎯 Detection Thresholds</h2>
+            <p class="section-description">Control when matches are considered potential duplicates.</p>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="similarity_threshold">Minimum Similarity Score</label>
+                    <input type="number" id="similarity_threshold" name="similarity_threshold" 
+                           value="{{ settings.similarity_threshold }}" min="0" max="160" 
+                           class="form-input" required>
+                    <div class="help-text">
+                        Points out of 160 total. Current: {{ "%.1f"|format(settings.similarity_threshold / 1.6) }}%
+                        <br><small>Lower values show more potential matches (less strict)</small>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="search_score_threshold">Minimum Atlas Search Score</label>
+                    <input type="number" id="search_score_threshold" name="search_score_threshold" 
+                           value="{{ settings.search_score_threshold }}" min="0" step="0.1" 
+                           class="form-input" required>
+                    <div class="help-text">
+                        MongoDB Atlas Search relevance score minimum
+                        <br><small>Higher values require better text matching</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <h2>🎨 Confidence Levels</h2>
+            <p class="section-description">Define similarity percentage thresholds for confidence classification.</p>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="high_confidence_threshold">High Confidence Threshold (%)</label>
+                    <input type="number" id="high_confidence_threshold" name="high_confidence_threshold" 
+                           value="{{ settings.high_confidence_threshold }}" min="1" max="100" 
+                           class="form-input" required>
+                    <div class="help-text">
+                        🚨 Scores above this show as "High Confidence"
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="medium_confidence_threshold">Medium Confidence Threshold (%)</label>
+                    <input type="number" id="medium_confidence_threshold" name="medium_confidence_threshold" 
+                           value="{{ settings.medium_confidence_threshold }}" min="1" max="100" 
+                           class="form-input" required>
+                    <div class="help-text">
+                        ⚠️ Scores above this show as "Possible Match"
+                        <br><small>Must be less than High Confidence threshold</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <h2>📊 Result Limits</h2>
+            <p class="section-description">Control the number of results returned.</p>
+            
+            <div class="form-group">
+                <label for="max_results">Maximum Results per Search</label>
+                <input type="number" id="max_results" name="max_results" 
+                       value="{{ settings.max_results }}" min="1" max="50" 
+                       class="form-input" required>
+                <div class="help-text">
+                    Maximum number of potential duplicates to display
+                    <br><small>More results may slow down the interface</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-actions">
+            <button type="submit" class="btn btn-primary">
+                💾 Save Settings
+            </button>
+            <button type="button" onclick="resetSettings()" class="btn btn-secondary">
+                🔄 Reset to Defaults
+            </button>
+            <a href="{{ url_for('index') }}" class="btn btn-outline">
+                ← Back to Search
+            </a>
+        </div>
+    </form>
+    
+    <div class="settings-preview">
+        <h3>Current Settings Summary</h3>
+        <div class="preview-grid">
+            <div class="preview-item">
+                <div class="preview-label">Minimum Similarity</div>
+                <div class="preview-value">{{ settings.similarity_threshold }} pts ({{ "%.1f"|format(settings.similarity_threshold / 1.6) }}%)</div>
+            </div>
+            <div class="preview-item">
+                <div class="preview-label">Minimum Search Score</div>
+                <div class="preview-value">{{ settings.search_score_threshold }}</div>
+            </div>
+            <div class="preview-item">
+                <div class="preview-label">High Confidence</div>
+                <div class="preview-value">&gt;{{ settings.high_confidence_threshold }}%</div>
+            </div>
+            <div class="preview-item">
+                <div class="preview-label">Medium Confidence</div>
+                <div class="preview-value">{{ settings.medium_confidence_threshold }}%-{{ settings.high_confidence_threshold }}%</div>
+            </div>
+            <div class="preview-item">
+                <div class="preview-label">Low Confidence</div>
+                <div class="preview-value">{{ "%.1f"|format(settings.similarity_threshold / 1.6) }}%-{{ settings.medium_confidence_threshold }}%</div>
+            </div>
+            <div class="preview-item">
+                <div class="preview-label">Max Results</div>
+                <div class="preview-value">{{ settings.max_results }} matches</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="help-section">
+    <h3>Settings Guide</h3>
+    <div class="help-grid">
+        <div class="help-card">
+            <div class="help-icon">🎯</div>
+            <h4>Similarity Threshold</h4>
+            <p>Lower values (10-20 pts) catch more potential duplicates but may include false positives. Higher values (40-60 pts) are more precise but may miss legitimate duplicates.</p>
+        </div>
+        <div class="help-card">
+            <div class="help-icon">🔍</div>
+            <h4>Search Score</h4>
+            <p>Atlas Search relevance score from text matching. Higher values require better textual similarity. Typically 0.0-50.0 range.</p>
+        </div>
+        <div class="help-card">
+            <div class="help-icon">🎨</div>
+            <h4>Confidence Levels</h4>
+            <p>Visual indicators help customer support prioritize reviews. High confidence matches should be reviewed first.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function resetSettings() {
+    if (confirm('Reset all settings to default values? This cannot be undone.')) {
+        fetch('{{ url_for("reset_settings") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        }).then(() => {
+            location.reload();
+        });
+    }
+}
+
+// Real-time preview updates
+document.addEventListener('DOMContentLoaded', function() {
+    const similarityInput = document.getElementById('similarity_threshold');
+    const searchScoreInput = document.getElementById('search_score_threshold');
+    
+    function updatePreview() {
+        const similarity = parseInt(similarityInput.value) || 24;
+        const percentage = (similarity / 1.6).toFixed(1);
+        
+        // Update preview values
+        document.querySelector('.preview-grid .preview-item:nth-child(1) .preview-value')
+            .textContent = `${similarity} pts (${percentage}%)`;
+        document.querySelector('.preview-grid .preview-item:nth-child(2) .preview-value')
+            .textContent = searchScoreInput.value || '0.0';
+    }
+    
+    similarityInput.addEventListener('input', updatePreview);
+    searchScoreInput.addEventListener('input', updatePreview);
+});
+</script>
+{% endblock %}

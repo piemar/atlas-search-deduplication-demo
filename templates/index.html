@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Lookup - Duplicate Detection System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Customer Profile Lookup</h1>
+    <p class="subtitle">Look up customer profiles when they call for support. System will alert you to potential duplicate records.</p>
+</div>
+
+<div class="search-container">
+    {% if templates %}
+    <div class="template-section">
+        <div class="template-header-collapsible" onclick="toggleTemplates()">
+            <h2>Quick Start - Use Template Customers</h2>
+            <span class="template-toggle" id="template-toggle">▼ Expand</span>
+        </div>
+        <div class="template-content" id="template-content" style="display: none;">
+            <p class="template-description">Select from sample customers to demonstrate customer lookup scenarios:</p>
+            
+            <div class="template-grid">
+                {% for template in templates %}
+                <div class="template-card" onclick="useTemplate('{{ template._id }}', '{{ template.first_name }}', '{{ template.last_name }}', '{{ template.email }}', '{{ template.phone }}')">
+                    <div class="template-header">
+                        <span class="template-category">{{ template.category }}</span>
+                        {% if template.record_type == 'duplicate' %}
+                            <span class="template-badge duplicate">🔍 Has Duplicates</span>
+                        {% else %}
+                            <span class="template-badge original">✨ Clean Record</span>
+                        {% endif %}
+                    </div>
+                    <div class="template-info">
+                        <div class="template-name">{{ template.first_name }} {{ template.last_name }}</div>
+                        <div class="template-contact">{{ template.email }}</div>
+                        <div class="template-contact">{{ template.phone }}</div>
+                    </div>
+                    <div class="template-description">{{ template.description }}</div>
+                    <div class="template-action">Click to simulate customer call →</div>
+                </div>
+                {% endfor %}
+            </div>
+        
+            <div class="template-divider">
+                <span>OR</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('search_duplicates') }}" class="search-form">
+        <div class="form-section">
+            <h2>Customer Profile Lookup</h2>
+            <p class="form-description">Enter customer information from their call to look up their profile. System will check for duplicate records automatically.</p>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="first_name">First Name</label>
+                    <input type="text" id="first_name" name="first_name" placeholder="e.g., John" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input type="text" id="last_name" name="last_name" placeholder="e.g., Smith" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="e.g., john.smith@email.com" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" placeholder="e.g., (555) 123-4567" class="form-input">
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    👤 Look Up Customer Profile
+                </button>
+                <button type="reset" class="btn btn-secondary">
+                    Clear Form
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="help-section">
+    <h3>Customer Support Workflow</h3>
+    <div class="help-grid">
+        <div class="help-card">
+            <div class="help-icon">📞</div>
+            <h4>1. Customer Calls</h4>
+            <p>Customer calls for support. Enter their information as they provide it.</p>
+        </div>
+        <div class="help-card">
+            <div class="help-icon">👤</div>
+            <h4>2. Profile Lookup</h4>
+            <p>System searches customer database and identifies potential duplicate records.</p>
+        </div>
+        <div class="help-card">
+            <div class="help-icon">⚠️</div>
+            <h4>3. Duplicate Alert</h4>
+            <p>Review duplicate alerts to ensure you're working with the correct customer record.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Template section toggle functionality
+window.toggleTemplates = function() {
+    const content = document.getElementById('template-content');
+    const toggle = document.getElementById('template-toggle');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.textContent = '▲ Collapse';
+    } else {
+        content.style.display = 'none';
+        toggle.textContent = '▼ Expand';
+    }
+};
+
+// Template selection functionality
+window.useTemplate = function(id, firstName, lastName, email, phone) {
+    document.getElementById('first_name').value = firstName || '';
+    document.getElementById('last_name').value = lastName || '';
+    document.getElementById('email').value = email || '';
+    document.getElementById('phone').value = phone || '';
+    
+    // Auto-collapse templates after selection
+    const content = document.getElementById('template-content');
+    const toggle = document.getElementById('template-toggle');
+    content.style.display = 'none';
+    toggle.textContent = '▼ Expand';
+    
+    // Scroll to form
+    document.querySelector('.search-form').scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+    });
+    
+    // Highlight the form briefly
+    const form = document.querySelector('.search-form');
+    form.style.background = '#f0f8ff';
+    setTimeout(() => {
+        form.style.background = '';
+    }, 2000);
+};
+</script>
+{% endblock %}

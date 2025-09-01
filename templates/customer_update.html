@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Update Customer - Customer Support System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Update Customer Information</h1>
+    <p class="subtitle">Modify customer details. System will check for duplicates if significant changes are made.</p>
+</div>
+
+<div class="update-container">
+    <div class="current-info">
+        <h3>Current Customer Information</h3>
+        <div class="customer-summary">
+            <div class="summary-item">
+                <strong>Name:</strong> {{ customer.first_name }} {{ customer.last_name }}
+            </div>
+            <div class="summary-item">
+                <strong>Email:</strong> {{ customer.email or 'Not provided' }}
+            </div>
+            <div class="summary-item">
+                <strong>Phone:</strong> {{ customer.phone or 'Not provided' }}
+            </div>
+            <div class="summary-item">
+                <strong>Record Type:</strong> 
+                <span class="record-type record-type-{{ customer.record_type }}">
+                    {{ customer.record_type.title() }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <form method="POST" class="update-form">
+        <div class="form-section">
+            <h3>Update Information</h3>
+            <p class="form-description">Modify the fields that need to be updated.</p>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="first_name">First Name *</label>
+                    <input type="text" id="first_name" name="first_name" required 
+                           value="{{ customer.first_name }}" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name *</label>
+                    <input type="text" id="last_name" name="last_name" required 
+                           value="{{ customer.last_name }}" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" 
+                           value="{{ customer.email or '' }}" class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" 
+                           value="{{ customer.phone or '' }}" class="form-input">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="address">Address</label>
+                <textarea id="address" name="address" rows="3" 
+                          class="form-input">{{ customer.address or '' }}</textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    ✏️ Update Customer
+                </button>
+                <a href="{{ url_for('search_consumer_by_id', consumer_id=customer._id) }}" 
+                   class="btn btn-secondary">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="update-notice">
+    <div class="notice-icon">ℹ️</div>
+    <div class="notice-content">
+        <h4>Duplicate Detection</h4>
+        <p>If the updated information matches existing customers, you'll be alerted before the changes are saved.</p>
+    </div>
+</div>
+{% endblock %}

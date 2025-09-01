@@ -1,0 +1,29 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "fields": {
+      "first_name": {
+        "type": "string",
+        "analyzer": "lucene.standard",
+        "searchAnalyzer": "lucene.standard"
+      },
+      "last_name": {
+        "type": "string",
+        "analyzer": "lucene.standard",
+        "searchAnalyzer": "lucene.standard"
+      },
+      "email": {
+        "type": "string",
+        "analyzer": "lucene.keyword"
+      },
+      "phone": {
+        "type": "string",
+        "analyzer": "lucene.keyword"
+      },
+      "address": {
+        "type": "string",
+        "analyzer": "lucene.english"
+      }
+    }
+  }
+}

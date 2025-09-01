@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Consumers - Duplicate Detection System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Manage duplicates</h1>
+    <p class="subtitle">View and filter all customers by duplicate status. Click any record to search for duplicates.</p>
+</div>
+
+<div class="browse-controls">
+    <form method="GET" class="filter-form">
+        <div class="filter-section">
+            <div class="filter-group">
+                <label for="filter">Filter by Type:</label>
+                <select name="filter" id="filter" class="filter-select">
+                    <option value="all" {% if current_filter == 'all' %}selected{% endif %}>All Records</option>
+                    <option value="original" {% if current_filter == 'original' %}selected{% endif %}>Original Records</option>
+                    <option value="duplicate" {% if current_filter == 'duplicate' %}selected{% endif %}>Known Duplicates</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="search">Search Records:</label>
+                <input type="text" name="search" id="search" value="{{ search_term }}" 
+                       placeholder="Search name, email, or phone..." class="filter-input">
+            </div>
+            
+            <div class="filter-group">
+                <label for="per_page">Records per page:</label>
+                <select name="per_page" id="per_page" class="filter-select">
+                    <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <a href="{{ url_for('browse_consumers') }}" class="btn btn-secondary">Clear All</a>
+        </div>
+    </form>
+</div>
+
+<div class="stats-summary">
+    <div class="stat-card">
+        <div class="stat-number">{{ "{:,}".format(stats.total_records) }}</div>
+        <div class="stat-label">Total Records</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ "{:,}".format(stats.original_records) }}</div>
+        <div class="stat-label">Original Records</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ "{:,}".format(stats.duplicate_records) }}</div>
+        <div class="stat-label">Known Duplicates</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ "{:,}".format(stats.filtered_records) }}</div>
+        <div class="stat-label">Filtered Results</div>
+    </div>
+</div>
+
+{% if consumers %}
+<div class="consumers-table-container">
+    <table class="consumers-table">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Similarity Score</th>
+                <th>Search Score</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for consumer in consumers %}
+            <tr class="consumer-row" data-consumer-id="{{ consumer._id }}">
+                <td>
+                    <span class="record-type record-type-{{ consumer.record_type }}">
+                        {% if consumer.record_type == 'duplicate' %}
+                            🔍 Duplicate
+                        {% else %}
+                            ✨ Original
+                        {% endif %}
+                    </span>
+                </td>
+                <td class="consumer-name">
+                    <strong>{{ consumer.first_name }} {{ consumer.last_name }}</strong>
+                </td>
+                <td class="consumer-email">{{ consumer.email }}</td>
+                <td class="consumer-phone">{{ consumer.phone }}</td>
+                <td class="score-cell">
+                    {% if consumer.max_similarity_score > 0 %}
+                        <div class="score-badge score-{{ 'high' if consumer.max_similarity_score > 70 else ('medium' if consumer.max_similarity_score > 40 else 'low') }}">
+                            {{ consumer.max_similarity_score }}%
+                        </div>
+                    {% else %}
+                        <span class="no-score">-</span>
+                    {% endif %}
+                </td>
+                <td class="score-cell">
+                    {% if consumer.max_search_score > 0 %}
+                        <div class="search-score-badge">
+                            {{ "%.2f"|format(consumer.max_search_score) }}
+                        </div>
+                    {% else %}
+                        <span class="no-score">-</span>
+                    {% endif %}
+                </td>
+                <td class="consumer-date">
+                    {% if consumer.createdAt %}
+                        {{ consumer.createdAt[:10] }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td class="consumer-actions">
+                    <div class="customer-actions">
+                        <a href="{{ url_for('search_consumer_by_id', consumer_id=consumer._id) }}" 
+                           class="btn btn-small btn-primary" title="Look up customer profile">
+                            👤 Lookup
+                        </a>
+                        <a href="{{ url_for('update_customer', consumer_id=consumer._id) }}" 
+                           class="btn btn-small btn-outline" title="Update customer information">
+                            ✏️ Update
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total_pages > 1 %}
+<div class="pagination">
+    <div class="pagination-info">
+        Showing {{ ((pagination.page - 1) * pagination.per_page + 1) }} - 
+        {{ (pagination.page * pagination.per_page) if pagination.page * pagination.per_page <= pagination.total_records else pagination.total_records }} 
+        of {{ "{:,}".format(pagination.total_records) }} records
+    </div>
+    
+    <div class="pagination-controls">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('browse_consumers', page=1, filter=current_filter, search=search_term, per_page=pagination.per_page) }}" 
+               class="btn btn-pagination">First</a>
+            <a href="{{ url_for('browse_consumers', page=pagination.prev_page, filter=current_filter, search=search_term, per_page=pagination.per_page) }}" 
+               class="btn btn-pagination">Previous</a>
+        {% endif %}
+        
+        <span class="pagination-current">
+            Page {{ pagination.page }} of {{ pagination.total_pages }}
+        </span>
+        
+        {% if pagination.has_next %}
+            <a href="{{ url_for('browse_consumers', page=pagination.next_page, filter=current_filter, search=search_term, per_page=pagination.per_page) }}" 
+               class="btn btn-pagination">Next</a>
+            <a href="{{ url_for('browse_consumers', page=pagination.total_pages, filter=current_filter, search=search_term, per_page=pagination.per_page) }}" 
+               class="btn btn-pagination">Last</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="no-results">
+    <div class="no-results-icon">📋</div>
+    <h2>No Consumers Found</h2>
+    <p>No consumers match your current filter criteria.</p>
+    <div class="no-results-actions">
+        <a href="{{ url_for('browse_consumers') }}" class="btn btn-primary">Show All Records</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Search</a>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Make table rows clickable
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.consumer-row');
+    rows.forEach(row => {
+        row.addEventListener('click', function(e) {
+            // Don't trigger if clicking on a button
+            if (e.target.tagName !== 'A' && e.target.tagName !== 'BUTTON') {
+                const consumerId = this.dataset.consumerId;
+                if (consumerId) {
+                    window.location.href = `/search_consumer/${consumerId}`;
+                }
+            }
+        });
+        
+        // Add hover effect
+        row.style.cursor = 'pointer';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,688 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - Duplicate Detection System{% endblock %}
+
+{% block content %}
+<div class="results-header">
+    <div class="results-title">
+        <h1>Duplicate Detection Results</h1>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">← New Search</a>
+    </div>
+    
+    <div class="search-summary">
+        <h3>🔍 {{ "Known Customer Profile:" if customer_data._id else "Searched Customer Profile:" }}</h3>
+        <div class="search-customer-card">
+            {% if customer_data._id %}
+            <div class="search-field">
+                <span class="search-label">Customer ID:</span>
+                <span class="search-value customer-id">{{ customer_data._id }}</span>
+            </div>
+            {% endif %}
+            
+            <div class="search-field">
+                <span class="search-label">First Name:</span>
+                <span class="search-value {{ 'has-value' if customer_data.first_name else 'no-value' }}">
+                    {{ customer_data.first_name or 'Not provided' }}
+                </span>
+            </div>
+            
+            <div class="search-field">
+                <span class="search-label">Last Name:</span>
+                <span class="search-value {{ 'has-value' if customer_data.last_name else 'no-value' }}">
+                    {{ customer_data.last_name or 'Not provided' }}
+                </span>
+            </div>
+            
+            <div class="search-field">
+                <span class="search-label">Email:</span>
+                <span class="search-value {{ 'has-value' if customer_data.email else 'no-value' }}">
+                    {{ customer_data.email or 'Not provided' }}
+                </span>
+            </div>
+            
+            <div class="search-field">
+                <span class="search-label">Phone:</span>
+                <span class="search-value {{ 'has-value' if customer_data.phone else 'no-value' }}">
+                    {{ customer_data.phone or 'Not provided' }}
+                </span>
+            </div>
+            
+            <div class="search-field">
+                <span class="search-label">Address:</span>
+                <span class="search-value {{ 'has-value' if customer_data.address else 'no-value' }}">
+                    {{ customer_data.address or 'Not provided' }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if duplicates %}
+    <div class="results-summary">
+        <div class="summary-card filter-card active" data-filter="all" onclick="filterDuplicates('all')">
+            <div class="summary-number">{{ duplicates|length }}</div>
+            <div class="summary-label">Potential Duplicates Found</div>
+            <div class="filter-indicator">🔍 Show All</div>
+        </div>
+        
+        {% set high_confidence = duplicates | selectattr("similarity_score", "gt", 70) | list %}
+        {% set medium_confidence = duplicates | selectattr("similarity_score", "gt", 40) | selectattr("similarity_score", "le", 70) | list %}
+        {% set low_confidence = duplicates | selectattr("similarity_score", "le", 40) | list %}
+        
+        <div class="summary-card filter-card" data-filter="high" onclick="filterDuplicates('high')">
+            <div class="summary-number confidence-high">{{ high_confidence|length }}</div>
+            <div class="summary-label">High Confidence</div>
+            <div class="filter-indicator">🚨 Filter High</div>
+        </div>
+        
+        <div class="summary-card filter-card" data-filter="medium" onclick="filterDuplicates('medium')">
+            <div class="summary-number confidence-medium">{{ medium_confidence|length }}</div>
+            <div class="summary-label">Possible Matches</div>
+            <div class="filter-indicator">⚠️ Filter Medium</div>
+        </div>
+        
+        <div class="summary-card filter-card" data-filter="low" onclick="filterDuplicates('low')">
+            <div class="summary-number confidence-low">{{ low_confidence|length }}</div>
+            <div class="summary-label">Worth Reviewing</div>
+            <div class="filter-indicator">❓ Filter Low</div>
+        </div>
+    </div>
+    
+    <div class="filter-status">
+        <span id="filterStatus">Showing all {{ duplicates|length }} potential duplicates</span>
+        <button id="clearFilter" onclick="filterDuplicates('all')" style="display: none;" class="btn btn-small btn-outline">
+            ✕ Clear Filter
+        </button>
+    </div>
+
+    <div class="results-container">
+        {% for duplicate in duplicates %}
+            <div class="duplicate-card confidence-{{ duplicate.confidence.class }}" 
+                 data-confidence-level="{{ duplicate.confidence.class }}"
+                 data-similarity-score="{{ duplicate.similarity_score }}">
+                <div class="duplicate-header">
+                    <div class="duplicate-rank">#{loop.index}</div>
+                    <div class="confidence-badge confidence-{{ duplicate.confidence.class }}">
+                        {{ duplicate.confidence.icon }} {{ duplicate.confidence.level }}
+                    </div>
+                    <div class="scores">
+                        <span class="score-item">
+                            <strong>Similarity:</strong> {{ duplicate.similarity_score }}%
+                        </span>
+                        <span class="score-item">
+                            <strong>Search Score:</strong> {{ "%.3f"|format(duplicate.search_score|default(0)) }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="duplicate-content">
+                    <div class="comparison-cards-container">
+                        <!-- Original Customer Card -->
+                        <div class="comparison-card original-card">
+                            <div class="card-header">
+                                <h4 class="card-title">📝 Original Customer</h4>
+                                {% if customer_data._id %}
+                                <div class="card-id">ID: <span class="customer-id">{{ customer_data._id }}</span></div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="field-row">
+                                    <div class="field-label">First Name</div>
+                                    <div class="field-value field-comparison original-field" 
+                                         data-field="first_name" 
+                                         data-original="{{ customer_data.first_name or '' }}" 
+                                         data-duplicate="{{ duplicate.first_name or '' }}">
+                                        {{ customer_data.first_name or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Last Name</div>
+                                    <div class="field-value field-comparison original-field" 
+                                         data-field="last_name" 
+                                         data-original="{{ customer_data.last_name or '' }}" 
+                                         data-duplicate="{{ duplicate.last_name or '' }}">
+                                        {{ customer_data.last_name or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Email</div>
+                                    <div class="field-value field-comparison original-field" 
+                                         data-field="email" 
+                                         data-original="{{ customer_data.email or '' }}" 
+                                         data-duplicate="{{ duplicate.email or '' }}">
+                                        {{ customer_data.email or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Phone</div>
+                                    <div class="field-value field-comparison original-field" 
+                                         data-field="phone" 
+                                         data-original="{{ customer_data.phone or '' }}" 
+                                         data-duplicate="{{ duplicate.phone or '' }}">
+                                        {{ customer_data.phone or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Address</div>
+                                    <div class="field-value field-comparison original-field" 
+                                         data-field="address" 
+                                         data-original="{{ customer_data.address or '' }}" 
+                                         data-duplicate="{{ duplicate.address or '' }}">
+                                        {{ customer_data.address or 'N/A' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- VS Arrow -->
+                        <div class="comparison-vs">
+                            <div class="vs-arrow">VS</div>
+                        </div>
+                        
+                        <!-- Potential Duplicate Card -->
+                        <div class="comparison-card duplicate-card">
+                            <div class="card-header">
+                                <h4 class="card-title">🔍 Potential Duplicate</h4>
+                                <div class="card-id">ID: <span class="customer-id">{{ duplicate._id }}</span></div>
+                            </div>
+                            
+                            <div class="card-body">
+                                <div class="field-row">
+                                    <div class="field-label">First Name</div>
+                                    <div class="field-value field-comparison duplicate-field" 
+                                         data-field="first_name" 
+                                         data-original="{{ customer_data.first_name or '' }}" 
+                                         data-duplicate="{{ duplicate.first_name or '' }}">
+                                        {{ duplicate.first_name or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Last Name</div>
+                                    <div class="field-value field-comparison duplicate-field" 
+                                         data-field="last_name" 
+                                         data-original="{{ customer_data.last_name or '' }}" 
+                                         data-duplicate="{{ duplicate.last_name or '' }}">
+                                        {{ duplicate.last_name or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Email</div>
+                                    <div class="field-value field-comparison duplicate-field" 
+                                         data-field="email" 
+                                         data-original="{{ customer_data.email or '' }}" 
+                                         data-duplicate="{{ duplicate.email or '' }}">
+                                        {{ duplicate.email or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Phone</div>
+                                    <div class="field-value field-comparison duplicate-field" 
+                                         data-field="phone" 
+                                         data-original="{{ customer_data.phone or '' }}" 
+                                         data-duplicate="{{ duplicate.phone or '' }}">
+                                        {{ duplicate.phone or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                <div class="field-row">
+                                    <div class="field-label">Address</div>
+                                    <div class="field-value field-comparison duplicate-field" 
+                                         data-field="address" 
+                                         data-original="{{ customer_data.address or '' }}" 
+                                         data-duplicate="{{ duplicate.address or '' }}">
+                                        {{ duplicate.address or 'N/A' }}
+                                    </div>
+                                </div>
+                                
+                                {% if duplicate.record_type == 'duplicate' %}
+                                <div class="field-row">
+                                    <div class="field-label">Record Type</div>
+                                    <div class="field-value synthetic-label">✓ Confirmed Synthetic Duplicate</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="confidence-description">
+                        <strong>{{ duplicate.confidence.level }}:</strong> {{ duplicate.confidence.description }}
+                    </div>
+                    
+                    <div class="duplicate-actions">
+                        {% if customer_data._id %}
+                        <!-- Merge functionality for existing customer records -->
+                        <button class="btn btn-small btn-primary merge-btn" 
+                                data-original-id="{{ customer_data._id }}" 
+                                data-duplicate-id="{{ duplicate._id }}" 
+                                data-duplicate-index="{{ loop.index0 }}">
+                            🔄 Merge Records
+                        </button>
+                        <button class="btn btn-small btn-secondary" onclick="alert('This would mark as reviewed in your system')">
+                            ✓ Mark as Reviewed
+                        </button>
+                        <button class="btn btn-small btn-outline" onclick="alert('This would flag as not a duplicate')">
+                            ❌ Not a Duplicate
+                        </button>
+                        {% else %}
+                        <!-- Actions for manual search results -->
+                        <a href="{{ url_for('search_consumer_by_id', consumer_id=duplicate._id) }}" 
+                           class="btn btn-small btn-primary">
+                            👤 View Full Profile
+                        </a>
+                        <a href="{{ url_for('update_customer', consumer_id=duplicate._id) }}" 
+                           class="btn btn-small btn-secondary">
+                            ✏️ Update Customer
+                        </a>
+                        <button class="btn btn-small btn-outline" onclick="alert('This would add to contact list for follow-up')">
+                            📞 Add to Follow-up
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="no-results">
+        <div class="no-results-icon">✅</div>
+        <h2>Clean Customer Record</h2>
+        <p>No duplicate records were found. This customer has a clean, unique profile in the system.</p>
+        <div class="no-results-suggestions">
+            <h4>Suggestions:</h4>
+            <ul>
+                <li>Try using partial name information</li>
+                <li>Check for common misspellings</li>
+                <li>Use alternative email addresses</li>
+                <li>Try different phone number formats</li>
+            </ul>
+        </div>
+    </div>
+{% endif %}
+
+{% if stats %}
+<div class="database-stats">
+    <h3>Database Statistics</h3>
+    <div class="stats-grid">
+        <div class="stat-item">
+            <div class="stat-number">{{ "{:,}".format(stats.total_records) }}</div>
+            <div class="stat-label">Total Records</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ "{:,}".format(stats.original_records) }}</div>
+            <div class="stat-label">Original Records</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ "{:,}".format(stats.duplicate_records) }}</div>
+            <div class="stat-label">Known Duplicates</div>
+        </div>
+        {% if stats.total_records > 0 %}
+        <div class="stat-item">
+            <div class="stat-number">{{ "%.1f"|format((stats.duplicate_records/stats.total_records)*100) }}%</div>
+            <div class="stat-label">Duplicate Rate</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Merge Records Popup -->
+<div id="mergePopup" class="merge-popup-overlay" style="display: none;">
+    <div class="merge-popup">
+        <div class="merge-popup-header">
+            <h3>🔄 Merge Customer Records</h3>
+            <button class="popup-close" onclick="closeMergePopup()">&times;</button>
+        </div>
+        
+        <div class="merge-popup-content">
+            <p class="merge-instructions">
+                Select which fields from the potential duplicate should be merged into the original customer record.
+                Fields with checkboxes will be copied from the duplicate to the original.
+            </p>
+            
+            <form id="mergeForm" action="{{ url_for('confirm_customer_action') }}" method="POST">
+                <input type="hidden" name="action" value="merge">
+                <input type="hidden" name="existing_customer_id" id="existingCustomerId">
+                <input type="hidden" name="customer_data" id="mergeCustomerData">
+                
+                <div class="merge-comparison">
+                    <div class="merge-column">
+                        <h4>📝 Original Customer (Target)</h4>
+                        <div id="originalCustomerData" class="merge-customer-data">
+                            <!-- Original customer data will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <div class="merge-arrow">➜</div>
+                    
+                    <div class="merge-column">
+                        <h4>🔍 Potential Duplicate (Source)</h4>
+                        <div id="duplicateCustomerData" class="merge-customer-data">
+                            <!-- Duplicate customer data with checkboxes will be populated here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="merge-actions">
+                    <button type="submit" class="btn btn-primary">
+                        ✅ Confirm Merge
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeMergePopup()">
+                        ❌ Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+console.log('Starting to load merge functionality...');
+
+// Store duplicate data for merge functionality
+let duplicatesData = [];
+
+{% if duplicates %}
+duplicatesData = [
+    {% for duplicate in duplicates %}
+    {
+        _id: "{{ duplicate._id }}",
+        first_name: "{{ (duplicate.first_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+        last_name: "{{ (duplicate.last_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+        email: "{{ (duplicate.email or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+        phone: "{{ (duplicate.phone or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+        address: "{{ (duplicate.address or '') | replace('"', '\\"') | replace('\n', '\\n') }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+{% endif %}
+
+// Original customer data
+const originalCustomer = {
+    _id: "{{ customer_data._id or '' }}",
+    first_name: "{{ (customer_data.first_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+    last_name: "{{ (customer_data.last_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+    email: "{{ (customer_data.email or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+    phone: "{{ (customer_data.phone or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
+    address: "{{ (customer_data.address or '') | replace('"', '\\"') | replace('\n', '\\n') }}"
+};
+
+function openMergePopup(originalId, duplicateId, duplicateIndex) {
+    console.log('openMergePopup called with:', originalId, duplicateId, duplicateIndex);
+    console.log('duplicatesData:', duplicatesData);
+    
+    const duplicate = duplicatesData[duplicateIndex];
+    if (!duplicate) {
+        alert('Error: Duplicate data not found - Index: ' + duplicateIndex + ', Data length: ' + duplicatesData.length);
+        return;
+    }
+    
+    // Set hidden form values
+    document.getElementById('existingCustomerId').value = duplicateId;
+    
+    // Populate original customer data (read-only)
+    const originalDiv = document.getElementById('originalCustomerData');
+    originalDiv.innerHTML = `
+        <div class="merge-field">
+            <label class="merge-label">Customer ID:</label>
+            <span class="merge-value customer-id">${escapeHtml(originalCustomer._id) || 'N/A'}</span>
+        </div>
+        <div class="merge-field">
+            <label class="merge-label">First Name:</label>
+            <span class="merge-value">${escapeHtml(originalCustomer.first_name) || 'N/A'}</span>
+        </div>
+        <div class="merge-field">
+            <label class="merge-label">Last Name:</label>
+            <span class="merge-value">${escapeHtml(originalCustomer.last_name) || 'N/A'}</span>
+        </div>
+        <div class="merge-field">
+            <label class="merge-label">Email:</label>
+            <span class="merge-value">${escapeHtml(originalCustomer.email) || 'N/A'}</span>
+        </div>
+        <div class="merge-field">
+            <label class="merge-label">Phone:</label>
+            <span class="merge-value">${escapeHtml(originalCustomer.phone) || 'N/A'}</span>
+        </div>
+        <div class="merge-field">
+            <label class="merge-label">Address:</label>
+            <span class="merge-value">${escapeHtml(originalCustomer.address) || 'N/A'}</span>
+        </div>
+    `;
+    
+    // Populate duplicate customer data with checkboxes
+    const duplicateDiv = document.getElementById('duplicateCustomerData');
+    duplicateDiv.innerHTML = `
+        <div class="merge-field">
+            <label class="merge-label">Customer ID:</label>
+            <span class="merge-value customer-id">${escapeHtml(duplicate._id)}</span>
+        </div>
+        <div class="merge-field ${getDifferenceClass('first_name', originalCustomer.first_name, duplicate.first_name)}">
+            <div class="merge-checkbox-container">
+                <input type="checkbox" id="merge_first_name" name="merge_first_name" value="${escapeHtml(duplicate.first_name)}" 
+                       ${shouldAutoCheck('first_name', originalCustomer.first_name, duplicate.first_name) ? 'checked' : ''}>
+                <label for="merge_first_name" class="merge-label">First Name:</label>
+            </div>
+            <span class="merge-value">${escapeHtml(duplicate.first_name) || 'N/A'}</span>
+        </div>
+        <div class="merge-field ${getDifferenceClass('last_name', originalCustomer.last_name, duplicate.last_name)}">
+            <div class="merge-checkbox-container">
+                <input type="checkbox" id="merge_last_name" name="merge_last_name" value="${escapeHtml(duplicate.last_name)}"
+                       ${shouldAutoCheck('last_name', originalCustomer.last_name, duplicate.last_name) ? 'checked' : ''}>
+                <label for="merge_last_name" class="merge-label">Last Name:</label>
+            </div>
+            <span class="merge-value">${escapeHtml(duplicate.last_name) || 'N/A'}</span>
+        </div>
+        <div class="merge-field ${getDifferenceClass('email', originalCustomer.email, duplicate.email)}">
+            <div class="merge-checkbox-container">
+                <input type="checkbox" id="merge_email" name="merge_email" value="${escapeHtml(duplicate.email)}"
+                       ${shouldAutoCheck('email', originalCustomer.email, duplicate.email) ? 'checked' : ''}>
+                <label for="merge_email" class="merge-label">Email:</label>
+            </div>
+            <span class="merge-value">${escapeHtml(duplicate.email) || 'N/A'}</span>
+        </div>
+        <div class="merge-field ${getDifferenceClass('phone', originalCustomer.phone, duplicate.phone)}">
+            <div class="merge-checkbox-container">
+                <input type="checkbox" id="merge_phone" name="merge_phone" value="${escapeHtml(duplicate.phone)}"
+                       ${shouldAutoCheck('phone', originalCustomer.phone, duplicate.phone) ? 'checked' : ''}>
+                <label for="merge_phone" class="merge-label">Phone:</label>
+            </div>
+            <span class="merge-value">${escapeHtml(duplicate.phone) || 'N/A'}</span>
+        </div>
+        <div class="merge-field ${getDifferenceClass('address', originalCustomer.address, duplicate.address)}">
+            <div class="merge-checkbox-container">
+                <input type="checkbox" id="merge_address" name="merge_address" value="${escapeHtml(duplicate.address)}"
+                       ${shouldAutoCheck('address', originalCustomer.address, duplicate.address) ? 'checked' : ''}>
+                <label for="merge_address" class="merge-label">Address:</label>
+            </div>
+            <span class="merge-value">${escapeHtml(duplicate.address) || 'N/A'}</span>
+        </div>
+    `;
+    
+    // Show popup
+    document.getElementById('mergePopup').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMergePopup() {
+    document.getElementById('mergePopup').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+function getDifferenceClass(field, originalValue, duplicateValue) {
+    const orig = (originalValue || '').toLowerCase().trim();
+    const dup = (duplicateValue || '').toLowerCase().trim();
+    return orig !== dup ? 'field-different' : '';
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function shouldAutoCheck(field, originalValue, duplicateValue) {
+    const orig = (originalValue || '').trim();
+    const dup = (duplicateValue || '').trim();
+    
+    // Auto-check if duplicate has value and original doesn't
+    if (dup && !orig) return true;
+    
+    // Auto-check if duplicate value is longer/more complete
+    if (dup && orig && dup.length > orig.length) return true;
+    
+    return false;
+}
+
+// Highlight field differences on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const fieldComparisons = document.querySelectorAll('.field-comparison');
+    
+    fieldComparisons.forEach(function(element) {
+        const original = element.getAttribute('data-original').toLowerCase().trim();
+        const duplicate = element.getAttribute('data-duplicate').toLowerCase().trim();
+        
+        if (original !== duplicate) {
+            element.classList.add('field-different');
+        }
+    });
+});
+
+// Close popup when clicking outside
+document.addEventListener('DOMContentLoaded', function() {
+    const mergePopup = document.getElementById('mergePopup');
+    if (mergePopup) {
+        mergePopup.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeMergePopup();
+            }
+        });
+    }
+});
+
+// Initialize merge button event listeners when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Setting up merge button listeners...');
+    
+    // Add event listeners to all merge buttons
+    const mergeButtons = document.querySelectorAll('.merge-btn');
+    mergeButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const originalId = this.getAttribute('data-original-id');
+            const duplicateId = this.getAttribute('data-duplicate-id');
+            const duplicateIndex = parseInt(this.getAttribute('data-duplicate-index'));
+            
+            console.log('Merge button clicked:', { originalId, duplicateId, duplicateIndex });
+            
+            if (typeof openMergePopup === 'function') {
+                openMergePopup(originalId, duplicateId, duplicateIndex);
+            } else {
+                console.error('openMergePopup function not available');
+                alert('Merge functionality is not ready. Please refresh the page and try again.');
+            }
+        });
+    });
+    
+    console.log('Merge functionality loaded successfully. Functions available:', {
+    openMergePopup: typeof openMergePopup,
+    closeMergePopup: typeof closeMergePopup,
+    escapeHtml: typeof escapeHtml,
+    mergeButtonsCount: mergeButtons.length
+});
+});
+
+// Duplicate filtering functionality
+let currentFilter = 'all';
+
+function filterDuplicates(filterType) {
+    console.log('Filtering duplicates by:', filterType);
+    
+    currentFilter = filterType;
+    
+    // Update active filter card
+    document.querySelectorAll('.filter-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    document.querySelector(`[data-filter="${filterType}"]`).classList.add('active');
+    
+    // Get all duplicate cards
+    const duplicateCards = document.querySelectorAll('.duplicate-card');
+    let visibleCount = 0;
+    
+    duplicateCards.forEach(card => {
+        let shouldShow = false;
+        const similarityScore = parseInt(card.getAttribute('data-similarity-score') || 0);
+        
+        switch(filterType) {
+            case 'all':
+                shouldShow = true;
+                break;
+            case 'high':
+                shouldShow = similarityScore > 70;
+                break;
+            case 'medium':
+                shouldShow = similarityScore > 40 && similarityScore <= 70;
+                break;
+            case 'low':
+                shouldShow = similarityScore <= 40;
+                break;
+        }
+        
+        if (shouldShow) {
+            card.style.display = 'block';
+            card.style.animation = 'fadeIn 0.3s ease-in';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Update filter status
+    updateFilterStatus(filterType, visibleCount);
+    
+    // Show/hide clear filter button
+    const clearButton = document.getElementById('clearFilter');
+    if (filterType === 'all') {
+        clearButton.style.display = 'none';
+    } else {
+        clearButton.style.display = 'inline-block';
+    }
+}
+
+function updateFilterStatus(filterType, count) {
+    const statusElement = document.getElementById('filterStatus');
+    const filterNames = {
+        'all': 'all potential duplicates',
+        'high': 'high confidence matches',
+        'medium': 'possible matches', 
+        'low': 'low confidence matches'
+    };
+    
+    const filterIcons = {
+        'all': '🔍',
+        'high': '🚨',
+        'medium': '⚠️',
+        'low': '❓'
+    };
+    
+    statusElement.innerHTML = `${filterIcons[filterType]} Showing ${count} ${filterNames[filterType]}`;
+}
+
+// Add CSS animation for smooth filtering
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

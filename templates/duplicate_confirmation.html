@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Duplicate Alert - Customer Support System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="alert-header">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-text">
+            <h1>Potential Duplicate Detected</h1>
+            <p class="subtitle">Found existing customers that may match this record. Please review and choose how to proceed.</p>
+        </div>
+    </div>
+</div>
+
+<div class="duplicate-alert-container">
+    <div class="customer-info-section">
+        <h3>{{ "Adding" if action == "add" else "Updating" }} Customer Information</h3>
+        <div class="customer-card">
+            <div class="customer-details">
+                <div class="detail-item">
+                    <strong>Name:</strong> {{ customer_data.first_name }} {{ customer_data.last_name }}
+                </div>
+                <div class="detail-item">
+                    <strong>Email:</strong> {{ customer_data.email or 'Not provided' }}
+                </div>
+                <div class="detail-item">
+                    <strong>Phone:</strong> {{ customer_data.phone or 'Not provided' }}
+                </div>
+                {% if customer_data.address %}
+                <div class="detail-item">
+                    <strong>Address:</strong> {{ customer_data.address }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="duplicates-section">
+        <h3>Potential Duplicates Found</h3>
+        
+        {% for duplicate in duplicates %}
+        <div class="duplicate-match">
+            <div class="match-header">
+                <div class="match-confidence">
+                    <span class="confidence-badge confidence-{{ duplicate.confidence.class }}">
+                        {{ duplicate.confidence.icon }} {{ duplicate.similarity_score }}% Match
+                    </span>
+                </div>
+                <div class="match-actions">
+                    <button class="btn btn-small btn-outline" 
+                            onclick="selectExistingCustomer('{{ duplicate._id }}', '{{ duplicate.first_name }} {{ duplicate.last_name }}')">
+                        Use This Record
+                    </button>
+                </div>
+            </div>
+            
+            <div class="match-details">
+                <div class="detail-comparison">
+                    <div class="detail-item">
+                        <strong>Customer ID:</strong> <span class="customer-id">{{ duplicate._id }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Name:</strong> {{ duplicate.first_name }} {{ duplicate.last_name }}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Email:</strong> {{ duplicate.email }}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Phone:</strong> {{ duplicate.phone }}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Record Type:</strong> 
+                        <span class="record-type record-type-{{ duplicate.record_type }}">
+                            {{ duplicate.record_type.title() }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="action-section">
+        <h3>What would you like to do?</h3>
+        
+        <form method="POST" action="{{ url_for('confirm_customer_action') }}" id="actionForm">
+            <!-- Hidden fields to preserve customer data -->
+            <input type="hidden" name="action" value="{{ action }}">
+            <input type="hidden" name="first_name" value="{{ customer_data.first_name }}">
+            <input type="hidden" name="last_name" value="{{ customer_data.last_name }}">
+            <input type="hidden" name="email" value="{{ customer_data.email }}">
+            <input type="hidden" name="phone" value="{{ customer_data.phone }}">
+            <input type="hidden" name="address" value="{{ customer_data.address }}">
+            {% if action == "update" %}
+            <input type="hidden" name="customer_id" value="{{ customer_data._id }}">
+            {% endif %}
+            <input type="hidden" name="choice" id="choice">
+            <input type="hidden" name="existing_customer_id" id="existing_customer_id">
+            
+            <div class="action-options">
+                <div class="action-card" onclick="setChoice('proceed')">
+                    <div class="action-icon">➕</div>
+                    <h4>Proceed Anyway</h4>
+                    <p>These are different customers. {{ "Add" if action == "add" else "Update" }} as planned.</p>
+                    <div class="action-button">
+                        <span class="btn btn-primary">Continue</span>
+                    </div>
+                </div>
+                
+                <div class="action-card" onclick="showExistingSelection()">
+                    <div class="action-icon">👤</div>
+                    <h4>Use Existing Record</h4>
+                    <p>This customer already exists. Use one of the existing records instead.</p>
+                    <div class="action-button">
+                        <span class="btn btn-outline">Select Existing</span>
+                    </div>
+                </div>
+                
+                <div class="action-card" onclick="setChoice('merge')">
+                    <div class="action-icon">🔄</div>
+                    <h4>Merge Information</h4>
+                    <p>Combine information from existing and new records.</p>
+                    <div class="action-button">
+                        <span class="btn btn-secondary">Merge Records</span>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function setChoice(choice) {
+    document.getElementById('choice').value = choice;
+    document.getElementById('actionForm').submit();
+}
+
+function selectExistingCustomer(customerId, customerName) {
+    document.getElementById('existing_customer_id').value = customerId;
+    document.getElementById('choice').value = 'use_existing';
+    
+    if (confirm(`Use existing customer record for "${customerName}"?`)) {
+        document.getElementById('actionForm').submit();
+    }
+}
+
+function showExistingSelection() {
+    alert('Click "Use This Record" button next to the customer you want to use.');
+}
+
+// Make action cards clickable
+document.addEventListener('DOMContentLoaded', function() {
+    const actionCards = document.querySelectorAll('.action-card');
+    actionCards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        });
+    });
+});
+</script>
+{% endblock %}

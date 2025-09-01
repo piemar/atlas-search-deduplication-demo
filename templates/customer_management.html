@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Management - Customer Support System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Customer Management</h1>
+    <p class="subtitle">Add new customers or update existing customer information. System automatically checks for duplicates.</p>
+</div>
+
+<div class="management-container">
+    <div class="management-section">
+        <h2>Add New Customer</h2>
+        <p class="section-description">When a new customer calls, add their information here. System will check for existing records.</p>
+        
+        <form method="POST" action="{{ url_for('add_customer') }}" class="customer-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="first_name">First Name *</label>
+                    <input type="text" id="first_name" name="first_name" required class="form-input" placeholder="Customer's first name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name *</label>
+                    <input type="text" id="last_name" name="last_name" required class="form-input" placeholder="Customer's last name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-input" placeholder="customer@email.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" class="form-input" placeholder="(555) 123-4567">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="address">Address (Optional)</label>
+                <textarea id="address" name="address" rows="3" class="form-input" placeholder="Customer's full address"></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    ➕ Add Customer
+                </button>
+                <button type="reset" class="btn btn-secondary">
+                    Clear Form
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="management-divider">
+        <span>OR</span>
+    </div>
+    
+    <div class="management-section">
+        <h2>Update Existing Customer</h2>
+        <p class="section-description">Find and update existing customer information when they call with changes.</p>
+        
+        <div class="update-options">
+            <div class="update-card">
+                <div class="update-icon">🔍</div>
+                <h3>Search & Update</h3>
+                <p>Look up a customer first, then update their information from the results.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-outline">
+                    Search Customers
+                </a>
+            </div>
+            
+            <div class="update-card">
+                <div class="update-icon">📋</div>
+                <h3>Browse & Update</h3>
+                <p>Browse the customer database and select a customer to update.</p>
+                <a href="{{ url_for('browse_consumers') }}" class="btn btn-outline">
+                    Duplicate Management
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="help-section">
+    <h3>Customer Management Workflow</h3>
+    <div class="help-grid">
+        <div class="help-card">
+            <div class="help-icon">➕</div>
+            <h4>Adding Customers</h4>
+            <p>System automatically checks for duplicates before creating new records.</p>
+        </div>
+        <div class="help-card">
+            <div class="help-icon">⚠️</div>
+            <h4>Duplicate Detection</h4>
+            <p>If duplicates are found, you'll be prompted to use existing record or proceed anyway.</p>
+        </div>
+        <div class="help-card">
+            <div class="help-icon">🔄</div>
+            <h4>Record Merging</h4>
+            <p>Options to merge information or use the best existing customer record.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

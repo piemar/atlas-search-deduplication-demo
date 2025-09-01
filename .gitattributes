@@ -1,0 +1,7 @@
+# Prevent .env files from being accidentally committed
+*.env filter=secret
+*.env.local filter=secret
+*.env.production filter=secret
+
+# Define the secret filter
+# This will make Git warn when trying to commit these files
