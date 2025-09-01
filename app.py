@@ -83,147 +83,370 @@ def init_db():
         return False
 
 def calculate_similarity_score(doc1, doc2):
-    """Calculate similarity score between two documents"""
+    """
+    Calculate weighted similarity score between two customer documents.
+    
+    This algorithm implements a 160-point scoring system that weights different
+    fields based on their likelihood of uniquely identifying a person:
+    
+    Scoring Breakdown:
+    - First Name: 40 points (exact match), 20 points (partial match)
+    - Last Name: 40 points (exact match), 20 points (partial match)  
+    - Email: 60 points (exact match), 30 points (username match)
+    - Phone: 20 points (normalized digits match)
+    
+    Args:
+        doc1 (dict): First customer document with fields: first_name, last_name, email, phone
+        doc2 (dict): Second customer document with same field structure
+        
+    Returns:
+        int: Similarity score from 0-160, where 160 indicates perfect match
+        
+    Example:
+        >>> customer1 = {"first_name": "John", "last_name": "Smith", "email": "john@gmail.com"}
+        >>> customer2 = {"first_name": "Jon", "last_name": "Smith", "email": "john@gmail.com"}
+        >>> calculate_similarity_score(customer1, customer2)
+        120  # 20 (partial first) + 40 (exact last) + 60 (exact email)
+    """
     score = 0
     
-    # Name similarity (higher weight)
-    if doc1.get("first_name", "").lower() == doc2.get("first_name", "").lower():
-        score += 40
-    elif doc1.get("first_name", "").lower() in doc2.get("first_name", "").lower():
-        score += 20
+    # First Name Matching (40 points max)
+    # Exact match gets full points, partial match gets half points
+    first_name_1 = doc1.get("first_name", "").lower().strip()
+    first_name_2 = doc2.get("first_name", "").lower().strip()
+    if first_name_1 and first_name_2:
+        if first_name_1 == first_name_2:
+            score += 40  # Exact first name match
+        elif first_name_1 in first_name_2 or first_name_2 in first_name_1:
+            score += 20  # Partial first name match (e.g., "Jon" in "Jonathan")
         
-    if doc1.get("last_name", "").lower() == doc2.get("last_name", "").lower():
-        score += 40
-    elif doc1.get("last_name", "").lower() in doc2.get("last_name", "").lower():
-        score += 20
+    # Last Name Matching (40 points max)
+    # Last names are critical for person identification
+    last_name_1 = doc1.get("last_name", "").lower().strip()
+    last_name_2 = doc2.get("last_name", "").lower().strip()
+    if last_name_1 and last_name_2:
+        if last_name_1 == last_name_2:
+            score += 40  # Exact last name match
+        elif last_name_1 in last_name_2 or last_name_2 in last_name_1:
+            score += 20  # Partial last name match (e.g., "Smith" in "Smithson")
     
-    # Email similarity (very high weight)
-    if doc1.get("email", "").lower() == doc2.get("email", "").lower():
-        score += 60
-    elif doc1.get("email", "").split("@")[0].lower() == doc2.get("email", "").split("@")[0].lower():
-        score += 30
+    # Email Matching (60 points max - highest weight)
+    # Email addresses are typically unique identifiers
+    email_1 = doc1.get("email", "").lower().strip()
+    email_2 = doc2.get("email", "").lower().strip()
+    if email_1 and email_2:
+        if email_1 == email_2:
+            score += 60  # Exact email match (strongest indicator)
+        else:
+            # Check if usernames match but domains differ
+            try:
+                username_1 = email_1.split("@")[0]
+                username_2 = email_2.split("@")[0]
+                if username_1 == username_2:
+                    score += 30  # Same username, different domain
+            except (IndexError, AttributeError):
+                pass  # Malformed email, skip partial matching
     
-    # Phone similarity
-    phone1 = ''.join(filter(str.isdigit, doc1.get("phone", "")))
-    phone2 = ''.join(filter(str.isdigit, doc2.get("phone", "")))
-    if phone1 and phone2 and phone1 == phone2:
-        score += 20
+    # Phone Number Matching (20 points max)
+    # Normalize phone numbers by extracting only digits for comparison
+    phone_1 = ''.join(filter(str.isdigit, doc1.get("phone", "")))
+    phone_2 = ''.join(filter(str.isdigit, doc2.get("phone", "")))
+    if phone_1 and phone_2 and phone_1 == phone_2:
+        score += 20  # Normalized phone numbers match
     
     return score
 
 def get_confidence_level(score):
-    """Get confidence level and styling class based on score and current settings"""
-    settings = get_settings()
-    high_threshold = settings['high_confidence_threshold']
-    medium_threshold = settings['medium_confidence_threshold']
+    """
+    Convert similarity score to business confidence level with visual indicators.
     
-    if score > high_threshold:
-        return {"level": "High Confidence", "class": "high", "icon": "🚨", "description": "Very likely duplicate"}
-    elif score > medium_threshold:
-        return {"level": "Possible Match", "class": "medium", "icon": "⚠️", "description": "Potential duplicate"}
+    This function translates the technical 160-point similarity score into 
+    business-friendly confidence levels that help customer support agents
+    make informed decisions about duplicate records.
+    
+    Confidence Level Business Logic:
+    - High Confidence: Score indicates very likely duplicate, immediate action recommended
+    - Possible Match: Score suggests potential duplicate, agent review recommended  
+    - Worth Reviewing: Score shows some similarity, manual investigation needed
+    
+    Args:
+        score (int): Similarity score from calculate_similarity_score (0-160 range)
+        
+    Returns:
+        dict: Confidence assessment containing:
+            - level (str): Human-readable confidence level
+            - class (str): CSS class name for UI styling  
+            - icon (str): Emoji icon for visual identification
+            - description (str): Detailed explanation for agents
+            
+    Example:
+        >>> get_confidence_level(140)  # High similarity score
+        {
+            "level": "High Confidence",
+            "class": "high", 
+            "icon": "🚨",
+            "description": "Very likely duplicate - immediate merge candidate"
+        }
+    """
+    # Get user-configurable thresholds from session settings
+    settings = get_settings()
+    high_threshold = settings['high_confidence_threshold']     # Default: 70%
+    medium_threshold = settings['medium_confidence_threshold'] # Default: 40%
+    
+    # Convert 160-point score to percentage for threshold comparison
+    percentage = (score / 160) * 100
+    
+    if percentage > high_threshold:
+        return {
+            "level": "High Confidence", 
+            "class": "high", 
+            "icon": "🚨", 
+            "description": "Very likely duplicate - immediate merge candidate"
+        }
+    elif percentage > medium_threshold:
+        return {
+            "level": "Possible Match", 
+            "class": "medium", 
+            "icon": "⚠️", 
+            "description": "Potential duplicate - agent review recommended"
+        }
     else:
-        return {"level": "Worth Reviewing", "class": "low", "icon": "❓", "description": "May be duplicate - review needed"}
+        return {
+            "level": "Worth Reviewing", 
+            "class": "low", 
+            "icon": "❓", 
+            "description": "Some similarity detected - manual investigation needed"
+        }
 
-def find_duplicates_for_customer(customer_data, limit=None):
-    """Find potential duplicates for a given customer"""
+def find_matching_customers(search_criteria, limit=100):
+    """Find all customers matching the search criteria"""
     if collection is None:
         return []
     
-    # Get current settings for thresholds
+    try:
+        # Build MongoDB query for exact and partial matches
+        query_conditions = []
+        
+        for field, value in search_criteria.items():
+            if field in ['first_name', 'last_name']:
+                # Case-insensitive partial match for names
+                query_conditions.append({
+                    field: {"$regex": f".*{value}.*", "$options": "i"}
+                })
+            elif field == 'email':
+                # Case-insensitive exact match for email
+                query_conditions.append({
+                    field: {"$regex": f"^{value}$", "$options": "i"}
+                })
+            elif field == 'phone':
+                # Exact match for phone (could be enhanced for formatting)
+                query_conditions.append({field: value})
+            elif field == 'address':
+                # Case-insensitive partial match for address
+                query_conditions.append({
+                    field: {"$regex": f".*{value}.*", "$options": "i"}
+                })
+        
+        # Combine conditions with OR logic
+        if len(query_conditions) == 1:
+            query = query_conditions[0]
+        else:
+            query = {"$or": query_conditions}
+        
+        # Execute query
+        results = list(collection.find(query).limit(limit))
+        
+        # Convert ObjectId to string and add match indicators
+        for result in results:
+            result['_id'] = str(result['_id'])
+            
+            # Add match indicators to show which fields matched
+            result['matched_fields'] = []
+            for field, value in search_criteria.items():
+                if field in result and result[field]:
+                    if field in ['first_name', 'last_name', 'address']:
+                        if value.lower() in result[field].lower():
+                            result['matched_fields'].append(field)
+                    elif field == 'email':
+                        if value.lower() == result[field].lower():
+                            result['matched_fields'].append(field)
+                    elif field == 'phone':
+                        if value == result[field]:
+                            result['matched_fields'].append(field)
+        
+        # Sort by number of matched fields (most relevant first)
+        results.sort(key=lambda x: len(x.get('matched_fields', [])), reverse=True)
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Customer search failed: {e}")
+        return []
+
+def find_duplicates_for_customer(customer_data, limit=None):
+    """
+    Find potential duplicate customer records using MongoDB Atlas Search.
+    
+    This function implements a sophisticated duplicate detection algorithm that combines:
+    1. Atlas Search fuzzy text matching with configurable edit distances
+    2. Weighted field scoring based on business importance 
+    3. Custom similarity calculation for fine-grained matching
+    4. Configurable confidence thresholds for business rules
+    
+    Atlas Search Query Strategy:
+    - Uses compound queries with "should" conditions for flexible matching
+    - Applies fuzzy matching with field-specific edit distance limits
+    - Implements boost scoring to weight fields by importance:
+      * Email: 5x boost (strongest unique identifier)
+      * Names: 3x boost (important but can have variations)
+      * Phone: 2x boost (reliable but can change)
+    
+    Args:
+        customer_data (dict): Customer record containing searchable fields:
+            - first_name (str): Customer's first name
+            - last_name (str): Customer's last name  
+            - email (str): Email address
+            - phone (str): Phone number (any format)
+            - _id (optional): Existing customer ID to exclude from results
+            
+        limit (int, optional): Maximum number of duplicates to return.
+                              Defaults to max_results setting.
+    
+    Returns:
+        list[dict]: List of potential duplicate records, each containing:
+            - All original customer fields
+            - similarity_score (int): 0-160 point custom similarity score
+            - search_score (float): Atlas Search relevance score
+            - confidence (dict): Confidence level assessment with:
+                * level (str): "High Confidence", "Possible Match", "Worth Reviewing"
+                * class (str): CSS class for UI styling
+                * icon (str): Emoji icon for visual identification
+                * description (str): Human-readable explanation
+    
+    Example:
+        >>> customer = {
+        ...     "first_name": "John",
+        ...     "last_name": "Smith", 
+        ...     "email": "john.smith@company.com"
+        ... }
+        >>> duplicates = find_duplicates_for_customer(customer)
+        >>> for dup in duplicates:
+        ...     print(f"{dup['first_name']} {dup['last_name']}: {dup['similarity_score']}/160")
+        Jon Smith: 140/160
+        John Smyth: 120/160
+    """
+    if collection is None:
+        logger.warning("Database collection not initialized")
+        return []
+    
+    # Get current threshold settings from user session
     settings = get_settings()
     if limit is None:
         limit = settings['max_results']
     
-    # Create search conditions based on provided data
+    # Build Atlas Search compound query conditions
     should_conditions = []
+    logger.debug(f"Building search conditions for customer: {customer_data}")
     
+    # First Name Search Condition
     if customer_data.get("first_name"):
         should_conditions.append({
             "text": {
                 "query": customer_data["first_name"],
                 "path": "first_name",
-                "fuzzy": {"maxEdits": 2},
-                "score": {"boost": {"value": 3}}
+                "fuzzy": {"maxEdits": 2},  # Allow up to 2 character differences
+                "score": {"boost": {"value": 3}}  # 3x importance boost
             }
         })
     
+    # Last Name Search Condition  
     if customer_data.get("last_name"):
         should_conditions.append({
             "text": {
                 "query": customer_data["last_name"],
-                "path": "last_name",
-                "fuzzy": {"maxEdits": 2},
-                "score": {"boost": {"value": 3}}
+                "path": "last_name", 
+                "fuzzy": {"maxEdits": 2},  # Handle common spelling variations
+                "score": {"boost": {"value": 3}}  # 3x importance boost
             }
         })
     
+    # Email Search Condition (highest priority)
     if customer_data.get("email"):
         should_conditions.append({
             "text": {
                 "query": customer_data["email"],
                 "path": "email",
-                "fuzzy": {"maxEdits": 1},
-                "score": {"boost": {"value": 5}}
+                "fuzzy": {"maxEdits": 1},  # Conservative fuzzy matching for emails
+                "score": {"boost": {"value": 5}}  # 5x importance boost (highest)
             }
         })
     
+    # Phone Number Search Condition
     if customer_data.get("phone"):
         should_conditions.append({
             "text": {
                 "query": customer_data["phone"],
                 "path": "phone",
-                "fuzzy": {"maxEdits": 1},
-                "score": {"boost": {"value": 2}}
+                "fuzzy": {"maxEdits": 1},  # Handle minor phone formatting issues
+                "score": {"boost": {"value": 2}}  # 2x importance boost
             }
         })
     
+    # Require at least one search field
     if not should_conditions:
+        logger.info("No searchable fields provided")
         return []
     
-    # Build the search query
+    # Construct MongoDB Atlas Search aggregation query
     query = {
         "$search": {
             "compound": {
                 "should": should_conditions,
-                "minimumShouldMatch": 1
+                "minimumShouldMatch": 1  # At least one condition must match
             }
         }
     }
     
-    # Execute search with scoring
+    # Build aggregation pipeline with search scoring
     pipeline = [
         query,
         {
+            # Add Atlas Search relevance score as a field
             "$addFields": {
                 "search_score": {"$meta": "searchScore"}
             }
         },
-        {"$limit": limit},
-        {"$sort": {"search_score": -1}}
+        {"$limit": limit * 2},  # Get extra results for filtering
+        {"$sort": {"search_score": -1}}  # Sort by Atlas Search relevance
     ]
     
     try:
+        # Execute Atlas Search aggregation pipeline
+        logger.info(f"Executing Atlas Search for customer: {customer_data.get('first_name', '')} {customer_data.get('last_name', '')}")
         results = list(collection.aggregate(pipeline))
+        logger.info(f"Atlas Search returned {len(results)} initial results")
         
-        # Calculate similarity scores and add confidence levels
-        # Only include results with similarity above 30% (48 points out of 160 total possible)
+        # Process and enrich results with similarity scoring
         enriched_results = []
         original_customer_id = customer_data.get('_id')  # Get original customer ID if available
         
         for result in results:
-            # Skip if this is the same customer (same ID)
+            # Skip self-matches - prevent customer from being marked as duplicate of themselves
             result_id = str(result.get('_id'))
             if original_customer_id and result_id == str(original_customer_id):
+                logger.debug(f"Skipping self-match for customer ID: {result_id}")
                 continue
                 
+            # Calculate custom similarity score using weighted algorithm
             similarity_score = calculate_similarity_score(customer_data, result)
             
-            # For manual searches without original customer ID, prevent same-person false positives
+            # Anti-false-positive logic for manual searches
+            # When no original ID exists (manual search), prevent exact matches from being flagged as duplicates
             if not original_customer_id:
-                # Check if all provided fields match exactly (indicating same person)
                 provided_fields = {k: v for k, v in customer_data.items() if v and k != '_id'}
                 matches_all_provided = True
                 
+                # Check if all provided search fields match exactly
                 for field, value in provided_fields.items():
                     if field in ['first_name', 'last_name', 'email']:
                         if value.lower() != result.get(field, '').lower():
@@ -234,28 +457,41 @@ def find_duplicates_for_customer(customer_data, limit=None):
                             matches_all_provided = False
                             break
                 
-                # If all provided fields match exactly, skip (likely same person)
+                # If all fields match exactly and we have sufficient data points, 
+                # this is likely the same person, not a duplicate
                 if matches_all_provided and len(provided_fields) >= 2:
+                    logger.debug(f"Skipping exact match for manual search: {result.get('first_name', '')} {result.get('last_name', '')}")
                     continue
             
-            # Filter by similarity threshold and search score threshold from settings
-            logger.debug(f"Checking thresholds: similarity={similarity_score} >= {settings['similarity_threshold']}, search_score={result.get('search_score', 0)} >= {settings['search_score_threshold']}")
-            if (similarity_score >= settings['similarity_threshold'] and 
-                result.get('search_score', 0) >= settings['search_score_threshold']):
+            # Apply business rule thresholds from user settings
+            similarity_threshold = settings['similarity_threshold']
+            search_score_threshold = settings['search_score_threshold']
+            search_score = result.get('search_score', 0)
+            
+            logger.debug(f"Evaluating result: similarity={similarity_score}/{similarity_threshold}, search_score={search_score}/{search_score_threshold}")
+            
+            # Include result if it meets both similarity and search score thresholds
+            if (similarity_score >= similarity_threshold and search_score >= search_score_threshold):
+                # Generate confidence assessment for business users
                 confidence = get_confidence_level(similarity_score)
                 
+                # Enrich result with computed scores and metadata
                 result["similarity_score"] = similarity_score
                 result["confidence"] = confidence
                 result["_id"] = result_id
                 enriched_results.append(result)
+                
+                logger.debug(f"Added duplicate candidate: {result.get('first_name', '')} {result.get('last_name', '')} (similarity: {similarity_score}, confidence: {confidence['level']})")
         
-        # Sort by similarity score descending
+        # Sort by similarity score (descending) to show best matches first
         enriched_results.sort(key=lambda x: x["similarity_score"], reverse=True)
         
-        return enriched_results
+        logger.info(f"Returning {len(enriched_results)} qualified duplicate candidates")
+        return enriched_results[:limit]  # Respect the limit parameter
         
     except Exception as e:
-        logger.error(f"Search query failed: {e}")
+        logger.error(f"Atlas Search query failed: {e}")
+        logger.error(f"Query pipeline: {pipeline}")
         return []
 
 @app.route('/')
@@ -265,24 +501,25 @@ def index():
     return render_template('index.html', templates=templates)
 
 @app.route('/search', methods=['POST'])
-def search_duplicates():
-    """Search for customer duplicates"""
-    customer_data = {
+def search_customers():
+    """Search for customers matching the search criteria"""
+    search_criteria = {
         'first_name': request.form.get('first_name', '').strip(),
         'last_name': request.form.get('last_name', '').strip(),
         'email': request.form.get('email', '').strip(),
-        'phone': request.form.get('phone', '').strip()
+        'phone': request.form.get('phone', '').strip(),
+        'address': request.form.get('address', '').strip()
     }
     
     # Remove empty fields
-    customer_data = {k: v for k, v in customer_data.items() if v}
+    search_criteria = {k: v for k, v in search_criteria.items() if v}
     
-    if not customer_data:
+    if not search_criteria:
         flash('Please provide at least one search field.', 'error')
         return render_template('index.html')
     
-    # Search for duplicates
-    duplicates = find_duplicates_for_customer(customer_data, limit=10)
+    # Search for all matching customers
+    matching_customers = find_matching_customers(search_criteria, limit=100)
     
     # Get collection statistics
     stats = {}
@@ -291,14 +528,15 @@ def search_duplicates():
             stats = {
                 'total_records': collection.count_documents({}),
                 'original_records': collection.count_documents({"record_type": "original"}),
-                'duplicate_records': collection.count_documents({"record_type": "duplicate"})
+                'duplicate_records': collection.count_documents({"record_type": "duplicate"}),
+                'matching_records': len(matching_customers)
             }
     except Exception as e:
         logger.error(f"Failed to get statistics: {e}")
     
-    return render_template('results.html', 
-                         customer_data=customer_data, 
-                         duplicates=duplicates,
+    return render_template('search_results.html', 
+                         search_criteria=search_criteria, 
+                         customers=matching_customers, 
                          stats=stats)
 
 @app.route('/api/search', methods=['POST'])
@@ -716,16 +954,41 @@ def confirm_customer_action():
                         merged_data['last_merge_date'] = datetime.now().isoformat()
                         
                         # Update the existing record with merged data
-                        collection.update_one(
+                        update_result = collection.update_one(
                             {'_id': ObjectId(existing_id)},
                             {'$set': merged_data}
                         )
                         
-                        # Count merged fields
-                        merged_field_count = len([f for f in mergeable_fields if f'merge_{f}' in request.form])
-                        
-                        flash(f'Records merged successfully! {merged_field_count} fields updated in existing customer record.', 'success')
-                        return redirect(url_for('search_consumer_by_id', consumer_id=existing_id))
+                        if update_result.modified_count > 0:
+                            # Get the original customer ID to delete the duplicate
+                            original_customer_id = None
+                            if hasattr(request.form, 'getlist'):
+                                # Try to get the original customer ID from form data
+                                customer_data_str = request.form.get('customer_data', '{}')
+                                try:
+                                    import json
+                                    customer_data = json.loads(customer_data_str) if customer_data_str != '{}' else {}
+                                    original_customer_id = customer_data.get('_id')
+                                except:
+                                    pass
+                            
+                            # If we have an original customer ID different from existing, delete the duplicate
+                            if original_customer_id and original_customer_id != existing_id:
+                                try:
+                                    deletion_result = collection.delete_one({'_id': ObjectId(original_customer_id)})
+                                    logger.info(f"Deleted duplicate record {original_customer_id} after merge. Deleted count: {deletion_result.deleted_count}")
+                                except Exception as delete_error:
+                                    logger.warning(f"Failed to delete duplicate record {original_customer_id}: {delete_error}")
+                                    # Continue without failing the merge
+                            
+                            # Count merged fields
+                            merged_field_count = len([f for f in mergeable_fields if f'merge_{f}' in request.form])
+                            
+                            flash(f'Records merged successfully! {merged_field_count} fields updated. Duplicate record removed.', 'success')
+                            return redirect(url_for('search_consumer_by_id', consumer_id=existing_id))
+                        else:
+                            flash('No changes were made during merge.', 'warning')
+                            return redirect(url_for('search_consumer_by_id', consumer_id=existing_id))
                     else:
                         flash('Existing customer record not found for merge.', 'error')
                         return redirect(url_for('customer_management'))

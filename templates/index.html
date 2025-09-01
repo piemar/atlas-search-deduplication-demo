@@ -47,10 +47,10 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('search_duplicates') }}" class="search-form">
+    <form method="POST" action="{{ url_for('search_customers') }}" class="search-form">
         <div class="form-section">
             <h2>Customer Profile Lookup</h2>
-            <p class="form-description">Enter customer information from their call to look up their profile. System will check for duplicate records automatically.</p>
+            <p class="form-description">Enter customer information to find all matching customer records in the system.</p>
             
             <div class="form-grid">
                 <div class="form-group">
@@ -76,7 +76,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">
-                    👤 Look Up Customer Profile
+                    🔍 Find Matching Customers
                 </button>
                 <button type="reset" class="btn btn-secondary">
                     Clear Form

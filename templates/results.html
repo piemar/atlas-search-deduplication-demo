@@ -121,9 +121,13 @@
                         <div class="comparison-card original-card">
                             <div class="card-header">
                                 <h4 class="card-title">📝 Original Customer</h4>
-                                {% if customer_data._id %}
-                                <div class="card-id">ID: <span class="customer-id">{{ customer_data._id }}</span></div>
-                                {% endif %}
+                                <div class="card-id">
+                                    {% if customer_data._id %}
+                                    ID: <span class="customer-id">{{ customer_data._id }}</span>
+                                    {% else %}
+                                    ID: <span class="customer-id">Manual Search</span>
+                                    {% endif %}
+                                </div>
                             </div>
                             
                             <div class="card-body">
@@ -272,18 +276,21 @@
                             ❌ Not a Duplicate
                         </button>
                         {% else %}
-                        <!-- Actions for manual search results -->
+                        <!-- Actions for manual search results with direct merge -->
+                        <button class="btn btn-small btn-primary merge-btn-manual" 
+                                data-search-data="{{ customer_data | tojson | replace('"', '&quot;') }}" 
+                                data-duplicate-id="{{ duplicate._id }}" 
+                                data-duplicate-index="{{ loop.index0 }}">
+                            🔄 Quick Merge
+                        </button>
                         <a href="{{ url_for('search_consumer_by_id', consumer_id=duplicate._id) }}" 
-                           class="btn btn-small btn-primary">
+                           class="btn btn-small btn-secondary">
                             👤 View Full Profile
                         </a>
                         <a href="{{ url_for('update_customer', consumer_id=duplicate._id) }}" 
-                           class="btn btn-small btn-secondary">
+                           class="btn btn-small btn-outline">
                             ✏️ Update Customer
                         </a>
-                        <button class="btn btn-small btn-outline" onclick="alert('This would add to contact list for follow-up')">
-                            📞 Add to Follow-up
-                        </button>
                         {% endif %}
                     </div>
                 </div>
@@ -348,7 +355,7 @@
             </p>
             
             <form id="mergeForm" action="{{ url_for('confirm_customer_action') }}" method="POST">
-                <input type="hidden" name="action" value="merge">
+                <input type="hidden" name="choice" value="merge">
                 <input type="hidden" name="existing_customer_id" id="existingCustomerId">
                 <input type="hidden" name="customer_data" id="mergeCustomerData">
                 
@@ -394,11 +401,11 @@ duplicatesData = [
     {% for duplicate in duplicates %}
     {
         _id: "{{ duplicate._id }}",
-        first_name: "{{ (duplicate.first_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-        last_name: "{{ (duplicate.last_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-        email: "{{ (duplicate.email or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-        phone: "{{ (duplicate.phone or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-        address: "{{ (duplicate.address or '') | replace('"', '\\"') | replace('\n', '\\n') }}"
+        first_name: "{{ (duplicate.first_name or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+        last_name: "{{ (duplicate.last_name or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+        email: "{{ (duplicate.email or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+        phone: "{{ (duplicate.phone or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+        address: "{{ (duplicate.address or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}"
     }{% if not loop.last %},{% endif %}
     {% endfor %}
 ];
@@ -407,11 +414,11 @@ duplicatesData = [
 // Original customer data
 const originalCustomer = {
     _id: "{{ customer_data._id or '' }}",
-    first_name: "{{ (customer_data.first_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-    last_name: "{{ (customer_data.last_name or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-    email: "{{ (customer_data.email or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-    phone: "{{ (customer_data.phone or '') | replace('"', '\\"') | replace('\n', '\\n') }}",
-    address: "{{ (customer_data.address or '') | replace('"', '\\"') | replace('\n', '\\n') }}"
+    first_name: "{{ (customer_data.first_name or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+    last_name: "{{ (customer_data.last_name or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+    email: "{{ (customer_data.email or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+    phone: "{{ (customer_data.phone or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}",
+    address: "{{ (customer_data.address or '') | replace('\\', '\\\\') | replace('"', '\\"') | replace('\n', '\\n') | replace('\r', '\\r') | replace('\t', '\\t') }}"
 };
 
 function openMergePopup(originalId, duplicateId, duplicateIndex) {
@@ -426,6 +433,9 @@ function openMergePopup(originalId, duplicateId, duplicateIndex) {
     
     // Set hidden form values
     document.getElementById('existingCustomerId').value = duplicateId;
+    
+    // Pass the original customer data so backend knows which record to delete after merge
+    document.getElementById('mergeCustomerData').value = JSON.stringify(originalCustomer);
     
     // Populate original customer data (read-only)
     const originalDiv = document.getElementById('originalCustomerData');
@@ -573,6 +583,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listeners to all merge buttons
     const mergeButtons = document.querySelectorAll('.merge-btn');
+    const manualMergeButtons = document.querySelectorAll('.merge-btn-manual');
+    
+    // Handle existing customer merge buttons
     mergeButtons.forEach(function(button) {
         button.addEventListener('click', function() {
             const originalId = this.getAttribute('data-original-id');
@@ -590,11 +603,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Handle manual search merge buttons
+    manualMergeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const searchDataStr = this.getAttribute('data-search-data');
+            const duplicateId = this.getAttribute('data-duplicate-id');
+            
+            alert('Quick merge from manual search will be available soon. Please use "View Full Profile" for now.');
+        });
+    });
+    
     console.log('Merge functionality loaded successfully. Functions available:', {
     openMergePopup: typeof openMergePopup,
     closeMergePopup: typeof closeMergePopup,
     escapeHtml: typeof escapeHtml,
-    mergeButtonsCount: mergeButtons.length
+    mergeButtonsCount: mergeButtons.length,
+    manualMergeButtonsCount: manualMergeButtons ? manualMergeButtons.length : 0
 });
 });
 

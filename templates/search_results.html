@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - Customer Lookup{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Customer Search Results</h1>
+    <p class="subtitle">Found {{ customers|length }} customers matching your search criteria</p>
+</div>
+
+<!-- Search Criteria Summary -->
+<div class="search-summary">
+    <h3>🔍 Search Criteria Used:</h3>
+    <div class="search-criteria-grid">
+        {% for field, value in search_criteria.items() %}
+        <div class="search-field">
+            <span class="field-name">{{ field.replace('_', ' ').title() }}:</span>
+            <span class="field-value">{{ value }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Results Summary -->
+{% if customers %}
+<div class="results-summary">
+    <div class="summary-card">
+        <div class="summary-number">{{ customers|length }}</div>
+        <div class="summary-label">Customers Found</div>
+    </div>
+    
+    <div class="summary-card">
+        <div class="summary-number">{{ stats.total_records or 0 }}</div>
+        <div class="summary-label">Total Database Records</div>
+    </div>
+    
+    <div class="summary-card">
+        <div class="summary-number">{{ search_criteria|length }}</div>
+        <div class="summary-label">Search Fields Used</div>
+    </div>
+</div>
+
+<!-- Customer Results Table -->
+<div class="customers-table-container">
+    <table class="customers-table">
+        <thead>
+            <tr>
+                <th>Customer ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Type</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for customer in customers %}
+            <tr class="customer-row" {% if loop.first %}style="background-color: #f0f8ff;"{% endif %}>
+                <td class="customer-id-cell">
+                    <span class="customer-id">{{ customer._id }}</span>
+                </td>
+                <td class="customer-name">
+                    <strong>{{ customer.first_name or 'N/A' }} {{ customer.last_name or 'N/A' }}</strong>
+                </td>
+                <td class="customer-email">
+                    {{ customer.email or 'N/A' }}
+                </td>
+                <td class="customer-phone">
+                    {{ customer.phone or 'N/A' }}
+                </td>
+                <td class="customer-address">
+                    {{ (customer.address or 'N/A')[:50] }}{% if customer.address and customer.address|length > 50 %}...{% endif %}
+                </td>
+                <td class="record-type-cell">
+                    <span class="record-type record-type-{{ customer.record_type or 'original' }}">
+                        {% if customer.record_type == 'duplicate' %}
+                            🔍 Duplicate
+                        {% else %}
+                            ✨ Original
+                        {% endif %}
+                    </span>
+                </td>
+
+                <td class="customer-actions">
+                    <div class="customer-actions">
+                        <a href="{{ url_for('search_consumer_by_id', consumer_id=customer._id) }}" 
+                           class="btn btn-small btn-primary" title="View full profile and check for duplicates">
+                            👤 View Profile
+                        </a>
+                        <a href="{{ url_for('update_customer', consumer_id=customer._id) }}" 
+                           class="btn btn-small btn-outline" title="Update customer information">
+                            ✏️ Edit
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Search Actions -->
+<div class="search-actions">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+        🔍 New Search
+    </a>
+    <a href="{{ url_for('browse_consumers') }}" class="btn btn-outline">
+        📋 Duplicate Management
+    </a>
+    <a href="{{ url_for('customer_management') }}" class="btn btn-outline">
+        ➕ Add New Customer
+    </a>
+</div>
+
+{% else %}
+<!-- No Results Found -->
+<div class="no-results">
+    <div class="no-results-icon">🔍</div>
+    <h2>No Customers Found</h2>
+    <p>No customers match your search criteria. Try adjusting your search terms.</p>
+    
+    <div class="search-suggestions">
+        <h4>Search Tips:</h4>
+        <ul>
+            <li>Try using partial names instead of full names</li>
+            <li>Check spelling of email addresses</li>
+            <li>Use fewer search fields for broader results</li>
+            <li>Try searching by just first name or last name</li>
+        </ul>
+    </div>
+    
+    <div class="no-results-actions">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            🔍 Try Different Search
+        </a>
+        <a href="{{ url_for('browse_consumers') }}" class="btn btn-secondary">
+            📋 Duplicate ManagementTj
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<style>
+/* Search Results Specific Styles */
+.search-summary {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.search-criteria-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.field-name {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+.field-value {
+    background: #fff;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    font-family: monospace;
+}
+
+/* Customer Table Styling */
+.customers-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.customers-table thead {
+    background: #2c3e50;
+    color: white;
+}
+
+.customers-table th {
+    padding: 12px 16px;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.customers-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+.customer-row:hover {
+    background-color: #f8f9fa;
+}
+
+.customer-id-cell {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.75rem;
+    color: #495057;
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 4px 8px;
+    display: inline-block;
+}
+
+.customer-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.customer-email {
+    color: #495057;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.customer-phone {
+    color: #495057;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.customer-address {
+    color: #6c757d;
+    font-size: 0.8rem;
+    max-width: 200px;
+}
+
+.record-type {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.record-type-original {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.record-type-duplicate {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.search-suggestions {
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 1.5rem 0;
+    text-align: left;
+}
+
+.search-suggestions h4 {
+    margin-top: 0;
+    color: #0056b3;
+}
+
+.search-suggestions ul {
+    margin-bottom: 0;
+    padding-left: 1.5rem;
+}
+
+.search-suggestions li {
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.customers-table-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.search-actions {
+    margin-top: 2rem;
+    text-align: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .customers-table-container {
+        overflow-x: auto;
+    }
+    
+    .search-criteria-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .search-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+</style>
+{% endblock %}
+

@@ -66,12 +66,12 @@
         <thead>
             <tr>
                 <th>Type</th>
-                <th>Name</th>
+                <th>First Name</th>
+                <th>Last Name</th>
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Similarity Score</th>
                 <th>Search Score</th>
-                <th>Created</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -87,8 +87,11 @@
                         {% endif %}
                     </span>
                 </td>
-                <td class="consumer-name">
-                    <strong>{{ consumer.first_name }} {{ consumer.last_name }}</strong>
+                <td class="consumer-first-name">
+                    {{ consumer.first_name or 'N/A' }}
+                </td>
+                <td class="consumer-last-name">
+                    {{ consumer.last_name or 'N/A' }}
                 </td>
                 <td class="consumer-email">{{ consumer.email }}</td>
                 <td class="consumer-phone">{{ consumer.phone }}</td>
@@ -110,13 +113,7 @@
                         <span class="no-score">-</span>
                     {% endif %}
                 </td>
-                <td class="consumer-date">
-                    {% if consumer.createdAt %}
-                        {{ consumer.createdAt[:10] }}
-                    {% else %}
-                        N/A
-                    {% endif %}
-                </td>
+
                 <td class="consumer-actions">
                     <div class="customer-actions">
                         <a href="{{ url_for('search_consumer_by_id', consumer_id=consumer._id) }}" 
